@@ -1,6 +1,3 @@
-// Code your design here
-// Code your testbench here
-// or browse Examples
 
 `timescale 1ns/1ps
 
@@ -53,13 +50,11 @@ end
   assign full = (counter == 5'd16 ) ? 1'b1 : 1'b0;
   assign empty = (counter == 5'd0 ) ? 1'b1 : 1'b0;
 
-
 endmodule
 
 
 // Define an interface for the FIFO
 interface fifo_if;
-  
   logic clk, rst, write_en, read_en;         // Clock, read, and write signals
   logic full, empty;           // Flags indicating FIFO status
   logic [7:0] data_in;         // Data input
