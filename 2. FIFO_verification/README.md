@@ -28,30 +28,6 @@ A complete SystemVerilog verification environment for a synchronous FIFO design,
 
 ### Components
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Top Module (tb)                      │
-│  ┌──────────────┐  ┌─────────────┐  ┌───────────────┐ │
-│  │  Interface   │──│     DUT     │  │  Environment  │ │
-│  │  (fif)       │  │ (sync_fifo) │  │     (env)     │ │
-│  └──────────────┘  └─────────────┘  └───────────────┘ │
-└─────────────────────────────────────────────────────────┘
-                            │
-        ┌───────────────────┴───────────────────┐
-        │         Environment Components        │
-        ├───────────────────────────────────────┤
-        │  ┌──────────┐    ┌────────────┐      │
-        │  │Generator │───→│   Driver   │      │
-        │  └──────────┘    └────────────┘      │
-        │       │               │               │
-        │   Mailbox         Interface           │
-        │       │               │               │
-        │  ┌──────────┐    ┌────────────┐      │
-        │  │ Monitor  │───→│ Scoreboard │      │
-        │  └──────────┘    └────────────┘      │
-        └───────────────────────────────────────┘
-```
-
 ### 1. **Interface** (`fifo_interface`)
 Bundles all DUT signals for clean testbench-DUT connection.
 
@@ -95,17 +71,6 @@ Drives stimulus to DUT through interface.
 - `reset()` - Resets the DUT
 - `run()` - Continuously drives transactions from Generator
 
-**Key Concept:** Uses **non-blocking assignments (`<=`)** for interface signals.
-
-### 5. **Monitor** (`monitor`)
-Passively observes DUT behavior and captures data.
-
-**Features:**
-- Samples all signals (inputs + outputs) at each clock edge
-- Creates new transaction for each observation
-- Sends captured data to Scoreboard
-
-**Key Concept:** Uses **blocking assignments (`=`)** for transaction fields.
 
 ### 6. **Scoreboard** (`scoreboard`)
 Checks DUT correctness using a reference model.
@@ -152,90 +117,6 @@ Main testbench that ties everything together.
 - Clock generation (10ns period)
 - Environment creation and test execution
 
-## 🔑 Key Concepts Demonstrated
-
-### Blocking vs Non-Blocking Assignments
-| Context | Operator | Example |
-|---------|----------|---------|
-| Interface signals (hardware-like) | `<=` | `fif.data_in <= trdrv.data_in;` |
-| Class members (software-like) | `=` | `trmon.data_out = fif.data_out;` |
-
-**Why?** Prevents race conditions and ensures correct data capture in verification.
-
-### Object Creation Patterns
-| Component Type | Pattern | Reason |
-|----------------|---------|--------|
-| Producer (Monitor, Generator) | `new()` each iteration | Each transaction is unique |
-| Consumer (Driver, Scoreboard) | `new()` once in constructor | Reuse container |
-
-### Mailbox Communication
-```
-Generator → [gen_to_drv] → Driver
-Monitor → [mon_to_scb] → Scoreboard
-```
-
-### Constrained Random Verification
-- Weighted distribution of operations
-- Automatic stimulus generation
-- Better coverage than directed tests
-
-## 🛠️ Simulation Requirements
-
-**This testbench requires a commercial simulator with full SystemVerilog support:**
-
-### Supported Simulators
-- **ModelSim/QuestaSim** (Mentor Graphics)
-- **VCS** (Synopsys)  
-- **Xcelium** (Cadence)
-
-### NOT Supported
-- ❌ Iverilog (lacks OOP features)
-- ❌ Verilator (limited SV support)
-
-## 🚀 Compilation & Simulation
-
-### ModelSim/QuestaSim
-```bash
-# Compile
-vlog -sv fifo_sync.sv fifo_sync_tb.sv
-
-# Simulate
-vsim -c tb -do "run -all; quit"
-
-# With GUI
-vsim tb
-run -all
-```
-
-### VCS
-```bash
-# Compile and elaborate
-vcs -sverilog fifo_sync.sv fifo_sync_tb.sv
-
-# Run
-./simv
-```
-
-### Xcelium
-```bash
-# Compile and run
-xrun -sv fifo_sync.sv fifo_sync_tb.sv
-```
-
-## 📊 Expected Output
-
-```
-[drv]: reset working
-[drv]: data_in=123, write_en=1, read_en=0
-[scr]: data_in=123
-[mon]: data_out=0, full=0, empty=1
-[drv]: data_in=45, write_en=1, read_en=0
-[scr]: data_in=45
-...
-[drv]: data_in=78, write_en=0, read_en=1
-[scb]: PASS - Expected: 123, Got: 123
-...
-```
 
 ## 📈 Verification Metrics
 
@@ -255,39 +136,7 @@ This testbench demonstrates:
 - ✅ Interface-based connectivity
 - ✅ Parallel execution with fork-join
 
-## 🔧 Customization
 
-### Change Transaction Count
-```systemverilog
-// In top module
-env.gen.count = 50;  // Generate 50 transactions
-```
-
-### Modify Operation Distribution
-```systemverilog
-// In transaction class
-constraint operation_constraint {
-  operation dist {
-    0 := 50,  // More writes
-    1 := 30,  // Fewer reads
-    2 := 15,  // More simultaneous
-    3 := 5    // Less idle
-  };
-}
-```
-
-### Adjust Simulation Time
-```systemverilog
-// In environment run() task
-#2000;  // Run for 2000ns instead of 1000ns
-```
-
-## 🐛 Known Limitations
-
-- Requires commercial simulator
-- No waveform dumping (add `$dumpfile`/`$dumpvars` if needed)
-- Fixed FIFO depth (16 entries)
-- No coverage collection (can be added)
 
 ## 📚 References
 
@@ -295,17 +144,5 @@ constraint operation_constraint {
 - "SystemVerilog for Verification" by Chris Spear
 - UVM (Universal Verification Methodology) concepts
 
-## 👤 Author
-
-**Hemanth Kumar**
-- Learning-focused implementation
-- Built from scratch without copying reference code
-- Emphasis on understanding verification methodology
-
-## 📝 License
-
-Educational/Learning Purpose
-
----
 
 **Status:** ✅ Complete - All 8 components implemented and tested
