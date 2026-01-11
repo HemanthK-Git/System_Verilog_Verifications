@@ -104,6 +104,9 @@ class monitor;
 	forever begin
       @(posedge fif.clk);
       trmon = new();
+      trmon.data_in = fif.data_in;
+      trmon.write_en = fif.write_en;
+      trmon.read_en = fif.read_en;
       trmon.data_out = fif.data_out;
       trmon.full = fif.full;
       trmon.empty = fif.empty;
@@ -111,5 +114,119 @@ class monitor;
       $display("[mon] : data_out= %0d, full = %0d, empty = %0d",trmon.data_out, trmon.full, trmon.empty);
     end
   endtask
-     
 endclass
+
+// 6. Scoreboard
+class scoreboard;
+  transaction trscr;
+  mailbox #(transaction) scrmbx;
+  bit [7:0] queue[$];
+  int pass_count = 0;
+  int fail_count = 0;
+  
+  function new(mailbox #(transaction) scrmbx);
+    this.scrmbx = scrmbx;  
+    trscr = new();  
+  endfunction
+  
+  
+  task run;
+  	forever begin
+      scrmbx.get(trscr);
+      if(trscr.write_en && !trscr.full) begin
+        queue.push_back(trscr.data_in); 
+        $display("[scr]: data_in=%0d", trscr.data_in);
+      end
+      if(trscr.read_en && !trscr.empty) begin
+        if(queue.size()>0) begin
+          bit [7:0] expected = queue.pop_front();
+          if(expected == trscr.data_out) begin
+            pass_count++;
+            $display("[scr]: pass, expected=%0d and data_out = %0d",expected, trscr.data_out);
+          end
+          else begin
+            fail_count++;
+          $display("[scr]: fail, expected=%0d and data_out = %0d",expected, trscr.data_out);   
+          end
+        end        
+      end
+    end
+  endtask  
+endclass
+
+// 7. Environment
+class environment;
+  generator gen;
+  driver drv;
+  monitor mon;
+  scoreboard scr;
+  
+  mailbox #(transaction) gen_to_drv;
+  mailbox #(transaction) mon_to_scr;
+  
+  virtual fifo_interface fif;
+  
+  function new(virtual fifo_interface fif) ;
+    this.fif = fif;
+    
+    gen_to_drv = new();
+    mon_to_scr = new();
+    
+    gen = new(gen_to_drv);
+    drv = new(gen_to_drv);
+    mon = new(mon_to_scr);
+    scr = new(mon_to_scr);
+    
+    drv.fif = this.fif;
+    mon.fif = this.fif;  
+   
+  endfunction
+  
+  task pre_test;
+    drv.reset();    
+  endtask
+  
+  task test();
+    fork
+      gen.run();
+      drv.run();
+      mon.run();
+      scr.run();      
+    join_any   
+  endtask
+  
+  task run();
+    pre_test();
+    test();
+    #1000;
+    $finish;    
+  endtask
+endclass
+
+module tb();
+  fifo_interface fif();
+  
+  
+  sync_fifo dut(
+    .clk(fif.clk),
+    .rst(fif.rst),
+    .data_in(fif.data_in),
+    .write_en(fif.write_en),
+    .read_en(fif.read_en),
+    .data_out(fif.data_out),
+    .full(fif.full),
+    .empty(fif.empty)    
+  );
+  
+  initial begin
+    fif.clk = 0;
+  end
+
+  always #5 fif.clk = ~fif.clk;
+  
+  initial begin
+    environment env = new(fif);
+    env.gen.count = 20;
+    env.run();
+  end
+endmodule
